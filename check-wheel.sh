@@ -24,23 +24,21 @@ cd "$workdir"
 data=$(ls -d "$pkgname"-*.data/data)
 if test "$(uname)" = Linux; then
     # shellcheck disable=SC2016
-    runpath='\$ORIGIN/../lib'
-    syslibs='lib(c|m|dl|rt|pthread)|ld-linux-'
+    runpath='\$ORIGIN/../lib|\$ORIGIN'
+    runlibs='lib(c|m|dl|rt|pthread)|ld-linux-.*\.so|ld64\.so'
     print-rpath() { patchelf --print-rpath "$1"; }
     print-needed() { patchelf --print-needed "$1"; }
     if test -f "$data"/lib/libucp.so; then
-        # shellcheck disable=SC2016
-        runpath=$runpath'|\$ORIGIN'
-        syslibs=$syslibs'|libuc(m|p|s|t)'
+        runlibs=$runlibs'|libuc(m|p|s|t)'
     fi
 fi
 if test "$(uname)" = Darwin; then
     runpath='@executable_path/../lib/|@loader_path/'
-    syslibs='lib(mpi|pmpi|System)'
+    runlibs='lib(mpi|pmpi|System)'
     print-rpath()  { otool -l "$1" | sed -n '/RPATH/{n;n;p;}'; }
     print-needed() { otool -L "$1" | sed 1,1d; }
     if test -f "$data"/lib/libucp.dylib; then
-        syslibs=$syslibs'|libuc(m|p|s|t)'
+        runlibs=$runlibs'|libuc(m|p|s|t)'
     fi
 fi
 
@@ -55,17 +53,17 @@ done
 for bin in "$data"/bin/mpichversion "$data"/bin/mpivars; do
     echo check "$bin"...
     test -z "$(print-rpath  "$bin" | grep -vE "$runpath")"
-    test -z "$(print-needed "$bin" | grep -vE "$syslibs")"
+    test -z "$(print-needed "$bin" | grep -vE "$runlibs")"
 done
 for bin in "$data"/bin/mpiexec* "$data"/bin/hydra_*; do
     echo check "$bin"...
     test -z "$(print-rpath  "$bin" | grep -vE "$runpath")"
-    test -z "$(print-needed "$bin" | grep -vE "$syslibs")"
+    test -z "$(print-needed "$bin" | grep -vE "$runlibs")"
 done
 for lib in "$data"/lib/libmpi.*; do
     echo check "$lib"...
     test -z "$(print-rpath  "$lib" | grep -vE "$runpath")"
-    test -z "$(print-needed "$lib" | grep -vE "$syslibs")"
+    test -z "$(print-needed "$lib" | grep -vE "$runlibs")"
 done
 if test "$(uname)" = Linux; then
     libs=$(ls -d "$pkgname".libs)
