@@ -1,0 +1,96 @@
+name: cd
+
+permissions:
+  contents: read
+
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Variant'
+        default: ''
+        type: choice
+        options:
+          - ''
+          - ofi
+          - ucx
+      version:
+        description: 'Version'
+        default: '4.1.2'
+        required: false
+        type: string
+      release:
+        description: 'Release number'
+        default: ''
+        required: false
+        type: string
+      os-arch:
+        description: "Target OS-Architecture"
+        default: all
+        required: true
+        type: choice
+        options:
+          - all
+          - Linux
+          - Linux-aarch64
+          - Linux-ppc64le
+          - Linux-x86_64
+          - macOS
+          - macOS-arm64
+          - macOS-x86_64
+      publish-anaconda:
+        description: "Publish to Anaconda"
+        default: false
+        type: boolean
+
+jobs:
+
+  wheel:
+    uses: ./.github/workflows/cd-wheel.yml
+    with:
+      variant: ${{ inputs.variant }}
+      version: ${{ inputs.version }}
+      release: ${{ inputs.release }}
+      os-arch: ${{ inputs.os-arch }}
+
+  publish-anaconda:
+    if: ${{ inputs.publish-anaconda }}
+    needs: wheel
+    runs-on: ubuntu-latest
+    environment:
+      name: anaconda
+      url:  https://anaconda.org/mpi4py/mpich
+
+    steps:
+
+    - name: Download wheel artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: dist
+        pattern: wheel-*
+        merge-multiple: true
+
+    - name: Report sha256sum
+      run:  |
+        # Report sha256sum
+        echo '```'         >> $GITHUB_STEP_SUMMARY
+        sha256sum -b *.whl >> $GITHUB_STEP_SUMMARY
+        echo '```'         >> $GITHUB_STEP_SUMMARY
+      working-directory: dist
+
+    - name: Setup Micromamba
+      uses: mamba-org/setup-micromamba@v1
+      with:
+        environment-name: ac
+        create-args: anaconda-client python=3.11
+
+    - name: Publish to Anaconda
+      run:  |
+        # https://pypi.anaconda.org/mpi4py/simple
+        anaconda --token "$ANACONDA_TOKEN" \
+        upload --user "$ANACONDA_USER" --force \
+        dist/*.whl
+      env:
+        ANACONDA_USER:  mpi4py
+        ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
+      shell: bash -el {0}

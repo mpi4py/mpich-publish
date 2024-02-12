@@ -1,0 +1,190 @@
+name: cd-wheel
+
+permissions:
+  contents: read
+
+on:  # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      variant:
+        description: 'Variant'
+        default: ''
+        required: false
+        type: string
+      version:
+        description: 'Version'
+        default: '4.1.2'
+        required: false
+        type: string
+      release:
+        description: 'Release number'
+        default: ''
+        required: false
+        type: string
+      os-arch:
+        description: 'Target OS-Architecture'
+        default: ''
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Variant'
+        default: ''
+        type: choice
+        options:
+          - ''
+          - ofi
+          - ucx
+      version:
+        description: 'Version'
+        default: '4.1.2'
+        required: false
+        type: string
+      release:
+        description: 'Release number'
+        default: ''
+        required: false
+        type: string
+      os-arch:
+        description: "Target OS-Architecture"
+        default: Linux-x86_64
+        required: true
+        type: choice
+        options:
+          - all
+          - Linux
+          - Linux-aarch64
+          - Linux-ppc64le
+          - Linux-x86_64
+          - macOS
+          - macOS-arm64
+          - macOS-x86_64
+
+env:
+  MPINAME: 'mpich'
+  VARIANT: '${{ inputs.variant }}'
+  VERSION: '${{ inputs.version }}'
+  RELEASE: '${{ inputs.release }}'
+
+jobs:
+
+  setup:
+    runs-on: 'ubuntu-latest'
+    outputs:
+      matrix: ${{ steps.setup.outputs.matrix }}
+    steps:
+    - id: setup
+      shell: python
+      name: 'setup build matrix'
+      run: |
+        keys = ("os", "arch", "runner")
+        rows = [
+            ("Linux", "aarch64", "ubuntu-22.04"),
+            ("Linux", "ppc64le", "ubuntu-22.04"),
+            ("Linux", "x86_64",  "ubuntu-22.04"),
+            ("macOS", "arm64",   "macos-14"),
+            ("macOS", "x86_64",  "macos-11"),
+        ]
+        os, _, arch = "${{ inputs.os-arch }}".partition("-")
+        if os not in ("", "*", "all"):
+            rows = [row for row in rows if row[0] == os]
+        if arch not in ("", "*", "all"):
+            rows = [row for row in rows if row[1] == arch]
+        matrix = [dict(zip(keys, row)) for row in rows]
+        import os, json
+        with open(os.getenv("GITHUB_OUTPUT"), "w") as out:
+            print(f"matrix={json.dumps(matrix)}", file=out)
+
+  build:
+    needs: setup
+    if: ${{ needs.setup.outputs.matrix != '[]' }}
+    name: build-${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.setup.outputs.matrix) }}
+
+    steps:
+
+    - id: checkout
+      uses: actions/checkout@v4
+
+    - id: setup-gfortran
+      if: ${{ runner.os == 'macOS' }}
+      run: |
+        # create gfortran symlink
+        cd $(brew --prefix)/bin
+        gfortran=$(ls gfortran-* | sort | head -n 1)
+        sudo ln -s $gfortran gfortran
+
+    - id: setup-python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3
+
+    - id: setup-qemu
+      if: ${{ runner.os == 'Linux' }}
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: all
+
+    - id: bootstrap
+      run: ./bootstrap.sh
+
+    - id: source-date-epoch
+      run: |
+        SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
+        echo SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH >> $GITHUB_ENV
+        echo $(git log -1 --pretty=%ci) [timestamp=$SOURCE_DATE_EPOCH]
+
+    - id: build
+      uses: pypa/cibuildwheel@v2.16.5
+      timeout-minutes: 360
+      with:
+        package-dir: package
+        output-dir:  wheelhouse
+      env:
+        CIBW_BUILD_FRONTEND: "build"
+        CIBW_BUILD: "cp312-*"
+        CIBW_SKIP:  "*musllinux*"
+        CIBW_ARCHS: "${{ matrix.arch }}"
+        CIBW_BEFORE_ALL: >-
+          bash {project}/cibw-build-mpi.sh
+        CIBW_TEST_COMMAND: >-
+          bash {project}/cibw-check-mpi.sh
+        CIBW_ENVIRONMENT_PASS: >-
+          MPINAME VARIANT RELEASE
+        CIBW_ENVIRONMENT_LINUX: >-
+          SOURCE="/project/package/source"
+          WORKDIR="/project/package/workdir"
+          DESTDIR="/project/package/install"
+        CIBW_ENVIRONMENT_MACOS: >-
+          SOURCE="$PWD/package/source"
+          WORKDIR="$PWD/package/workdir"
+          DESTDIR="$PWD/package/install"
+        CIBW_REPAIR_WHEEL_COMMAND_MACOS: >
+          delocate-wheel
+          --ignore-missing-dependencies
+          --exclude libmpi --exclude libpmpi
+          --require-archs {delocate_archs}
+          -w {dest_dir} -v {wheel}
+
+    - id: sha256sum
+      run: |
+        # sha256sum
+        test $(uname) == Darwin && sha256sum() { shasum -a 256 $@; } || true
+        echo '```'         >> $GITHUB_STEP_SUMMARY
+        sha256sum -b *.whl >> $GITHUB_STEP_SUMMARY
+        echo '```'         >> $GITHUB_STEP_SUMMARY
+      working-directory: wheelhouse
+
+    - id: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: wheel-${{ matrix.os }}-${{ matrix.arch }}
+        path: wheelhouse/*.whl
+
+    - id: check
+      run: ./check-wheel.sh wheelhouse

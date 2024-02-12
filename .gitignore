@@ -1,0 +1,7 @@
+/package/
+!/package/setup.py
+/dist/
+/venv/
+*.egg-info/
+*.tar.gz
+*~
