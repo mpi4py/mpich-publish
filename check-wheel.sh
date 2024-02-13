@@ -25,58 +25,84 @@ data=$(ls -d "$pkgname"-*.data/data)
 if test "$(uname)" = Linux; then
     # shellcheck disable=SC2016
     runpath='\$ORIGIN/../lib|\$ORIGIN'
-    runlibs='lib(mpi|c|m|dl|rt|pthread)\.so\..*'
-    runlibs=$runlibs'|(ld-linux-.*|ld64)\.so\..*'
+    soregex='\.so\..*'
+    runlibs='lib(mpi|c|m|dl|rt|pthread)'$soregex
+    runlibs=$runlibs'|(ld-linux-.*|ld64)'$soregex
     print-runpath() { patchelf --print-rpath  "$1"; }
     print-needed()  { patchelf --print-needed "$1"; }
     if test -f "$data"/lib/libucp.so; then
-        runlibs=$runlibs'|libuc(m|p|s|t)'
+        runlibs=$runlibs'|libuc(m|p|s|t)'$soregex
     fi
 fi
 if test "$(uname)" = Darwin; then
     runpath='@executable_path/../lib/|@loader_path/'
-    runlibs='lib(mpi|pmpi|System)\..*\.dylib'
+    soregex='\..*\.dylib'
+    runlibs='lib(mpi|pmpi|System)'$soregex
     print-runpath() { otool -l "$1" | sed -n '/RPATH/{n;n;p;}'; }
     print-needed()  { otool -L "$1" | sed 1,1d; }
     if test -f "$data"/lib/libucp.dylib; then
-        runlibs=$runlibs'|libuc(m|p|s|t)\.'
+        runlibs=$runlibs'|libuc(m|p|s|t)'$soregex
     fi
+fi
+
+if test "$mpiname" = "mpich"; then
+    headers=(
+        "$data"/include/mpi.h
+        "$data"/include/mpio.h
+    )
+    scripts=(
+        "$data"/bin/mpicc
+        "$data"/bin/mpic++
+        "$data"/bin/mpicxx
+    )
+    programs=(
+        "$data"/bin/mpichversion
+        "$data"/bin/mpivars
+        "$data"/bin/mpiexec
+        "$data"/bin/mpiexec.*
+        "$data"/bin/hydra_*
+    )
+    libraries=(
+        "$data"/lib/libmpi.*
+    )
 fi
 
 check-dso() {
     local dso=$1 out1="" out2=""
     echo checking "$dso"...
-    test -f "$dso" || printf "ERROR: file not found"
+    test -f "$dso" || printf "ERROR: file not found\n"
     out1="$(print-runpath "$dso" | grep -vE "$runpath" || true)"
     test -z "$out1" || printf "ERROR: RUNPATH\n%s\n" "$out1"
     out2="$(print-needed  "$dso" | grep -vE "$runlibs" || true)"
     test -z "$out2" || printf "ERROR: NEEDED\n%s\n" "$out2"
-    test -z "$out1" -a  -z "$out2"
+    test -z "$out1" -a -z "$out2"
 }
 
-for hdr in "$data"/include/mpi.h "$data"/include/mpio.h; do
-    echo checking "$hdr"...
-    test -f "$hdr"
-    test -z "$(grep -E '^#include\s+"mpicxx\.h"' "$hdr" || true)"
+for header in "${headers[@]}"; do
+    echo checking "$header"...
+    test -f "$header"
+    out=$(grep -E '^#include\s+"mpicxx\.h"' "$header" || true)
+    test -z "$out" || printf "ERROR: include\n%s\n" "$out"
+    test -z "$out"
 done
-for script in "$data"/bin/mpicc "$data"/bin/mpicxx; do
+for script in "${scripts[@]}"; do
     echo checking "$script"...
     test -f "$script"
-    test -z "$(grep -E "/opt/$mpiname" "$script" || true)"
+    out=$(grep -E "/opt/$mpiname" "$script" || true)
+    test -z "$out" || printf "ERROR: prefix\n%s\n" "$out"
+    test -z "$out"
 done
-for bin in "$data"/bin/mpichversion "$data"/bin/mpivars; do
+for bin in "${programs[@]}"; do
     check-dso "$bin"
 done
-for bin in "$data"/bin/mpiexec* "$data"/bin/hydra_*; do
-    check-dso "$bin"
-done
-for lib in "$data"/lib/libmpi.*; do
+for lib in "${libraries[@]}"; do
     check-dso "$lib"
 done
 if test "$(uname)" = Linux; then
-    libs=$(ls -d "$pkgname".libs)
-    echo checking "$libs"...
-    test -z "$(ls -A "$libs")"
+    echo checking "$pkgname".libs...
+    out=$(ls -A "$pkgname".libs)
+    test -z "$out" || printf "ERROR: library\n%s\n" "$out"
+    test -z "$out"
 fi
 
 echo success!

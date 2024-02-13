@@ -4,29 +4,34 @@ set -euo pipefail
 mpiname="${MPINAME:-mpich}"
 variant="${VARIANT:-}"
 
-SOURCE=${SOURCE:-package/source}
-WORKDIR=${WORKDIR:-package/workdir}
-DESTDIR=${DESTDIR:-package/install}
+SOURCE=${SOURCE:-$PWD/package/source}
+WORKDIR=${WORKDIR:-$PWD/package/workdir}
+DESTDIR=${DESTDIR:-$PWD/package/install}
 PREFIX=${PREFIX:-"/opt/$mpiname"}
 
-options=(
-    CC=cc
-    CXX=c++
-    --prefix="$PREFIX"
-    --with-device=ch4:"${variant:-ofi}"
-    --with-pm=hydra:gforker
-    --with-libfabric=embedded
-    --with-ucx=embedded
-    --with-hwloc=embedded
-    --with-yaksa=embedded
-    --disable-cxx
-    --disable-static
-)
+if test "$mpiname" = "mpich"; then
+    options=(
+        CC=cc
+        CXX=c++
+        --prefix="$PREFIX"
+        --with-device=ch4:"${variant:-ofi}"
+        --with-pm=hydra:gforker
+        --with-libfabric=embedded
+        --with-ucx=embedded
+        --with-hwloc=embedded
+        --with-yaksa=embedded
+        --disable-cxx
+        --disable-static
+    )
+    if test "$(uname)" = Darwin; then
+        export MPICH_MPICC_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
+        export MPICH_MPICXX_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
+        export MPICH_MPIFORT_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
+    fi
+fi
+
 
 if test "$(uname)" = Darwin; then
-    export MPICH_MPICC_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
-    export MPICH_MPICXX_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
-    export MPICH_MPIFORT_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
     export MACOSX_DEPLOYMENT_TARGET="11.0"
     if test "$(uname -m)" = x86_64; then
         export MACOSX_DEPLOYMENT_TARGET="10.9"
@@ -42,13 +47,18 @@ case $(uname) in
     Darwin) njobs=$(sysctl -n hw.physicalcpu);;
 esac
 
-mkdir -p "$WORKDIR" && cd "$WORKDIR"
+mkdir -p "$WORKDIR"
+cd "$WORKDIR"
+
 echo running configure
 "$SOURCE"/configure "${options[@]}" || cat config.log
-echo disable manpages and documentation
+echo disabling manpages and documentation
 sed -i.orig 's/^\(install-data-local:\).*/\1/' Makefile
+
 echo running make with "${njobs:-1}" jobs
 make -j "${njobs:-1}" install DESTDIR="$DESTDIR"
+
+fixup-mpich() {
 
 cd "${DESTDIR}${PREFIX}"
 rm -f  include/*cxx.h
@@ -142,3 +152,7 @@ if test "$(uname)" = Darwin; then
         done
     fi
 fi
+
+} # fixup-mpich()
+
+fixup-"$mpiname"

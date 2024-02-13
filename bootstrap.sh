@@ -2,26 +2,27 @@
 set -euo pipefail
 
 mpiname=${MPINAME:-mpich}
-version=${VERSION:-4.1.2}
 
 if test "$mpiname" = "mpich"; then
+    version=${VERSION:-4.1.2}
     urlbase="https://www.mpich.org/static/downloads/$version"
     tarball="$mpiname-$version.tar.gz"
     license=COPYRIGHT
 fi
 
-if test ! -d package/source; then
+SOURCE=package/source
+if test ! -d "$SOURCE"; then
     if test ! -f "$tarball"; then
         echo downloading "$urlbase"/"$tarball"...
         curl -sO "$urlbase"/"$tarball"
     else
         echo reusing "$tarball"...
     fi
-    echo extracting "$tarball"...
+    echo extracting "$tarball" to "$SOURCE"...
     tar xf "$tarball"
-    mv "$mpiname-$version" "package/source"
+    mv "$mpiname-$version" "$SOURCE"
 else
-    echo reusing "package/source"...
+    echo reusing directory "$SOURCE"...
 fi
 echo copying license file...
-cp "package/source/$license" "package/LICENSE"
+cp "$SOURCE"/"$license" "package/LICENSE"

@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+mpiname="${MPINAME:-mpich}"
+
 tempdir="$(mktemp -d)"
 trap 'rm -rf $tempdir' EXIT
 cd "$tempdir"
@@ -25,22 +27,31 @@ int main(int argc, char *argv[])
 EOF
 ln -s helloworld.c helloworld.cxx
 
-set -x
+RUN() { echo + "$@"; "$@"; }
 
-command -v mpichversion
-mpichversion
+if test "$mpiname" == "mpich"; then
+    RUN command -v mpichversion
+    RUN mpichversion
+fi
 
-command -v mpivars
-mpivars -nodesc | grep 'Category .* has'
+if test "$mpiname" == "mpich"; then
+    RUN command -v mpivars
+    RUN mpivars -nodesc | grep 'Category .* has'
+fi
 
-command -v mpicc
-mpicc -show
-mpicc helloworld.c -o helloworld-c
+if test "$mpiname" = "openmpi"; then
+    RUN command -v ompi_info
+    RUN ompi_info
+fi
 
-command -v mpicxx
-mpicxx -show
-mpicxx helloworld.cxx -o helloworld-cxx
+RUN command -v mpicc
+RUN mpicc -show
+RUN mpicc helloworld.c -o helloworld-c
 
-command -v mpiexec
-mpiexec -n 5 ./helloworld-c
-mpiexec -n 5 ./helloworld-cxx
+RUN command -v mpicxx
+RUN mpicxx -show
+RUN mpicxx helloworld.cxx -o helloworld-cxx
+
+RUN command -v mpiexec
+RUN mpiexec -n 5 ./helloworld-c
+RUN mpiexec -n 5 ./helloworld-cxx

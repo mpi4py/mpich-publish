@@ -1,6 +1,5 @@
 from setuptools import setup
 from wheel.bdist_wheel import bdist_wheel
-import glob
 import re
 import os
 
@@ -22,22 +21,27 @@ variant = os.environ.get("VARIANT", "")
 release = os.environ.get("RELEASE", "")
 pkgname = f"{mpiname}-{variant}" if variant else mpiname
 
-version_re = re.compile(r"#define\s+MPICH_VERSION\s+\"(.*)\"")
-license = "LicenseRef-MPICH"
+if mpiname == "mpich":
+    project = "MPICH"
+    version_re = re.compile(r"""
+    \#define\s+MPICH_VERSION\s+\"(.*)\"
+    """, re.VERBOSE)
+    license = "LicenseRef-MPICH"
+    author = "MPICH Team"
+    author_email = "discuss@mpich.org"
+    project_urls = {
+        "Homepage":      "https://www.mpich.org",
+        "Downloads":     "https://www.mpich.org/downloads/",
+        "Documentation": "https://www.mpich.org/documentation/guides/",
+        "Source":        "https://github.com/pmodels/mpich",
+        "Issues":        "https://github.com/pmodels/mpich/issues",
+        "Discussions":   "https://github.com/pmodels/mpich/discussions",
+    }
+
 description = "A high performance implementation of MPI"
-long_description = """`MPICH <https://www.mpich.org/>`_ is a
+long_description = f"""`{project} <{project_urls["Homepage"]}>`_ is a
 high-performance and widely portable implementation of the Message
 Passing Interface (`MPI <https://www.mpi-forum.org/>`_) standard."""
-author = "MPICH Team"
-author_email = "discuss@mpich.org"
-project_urls = {
-    "Homepage":      "https://www.mpich.org",
-    "Downloads":     "https://www.mpich.org/downloads/",
-    "Documentation": "https://www.mpich.org/documentation/guides/",
-    "Source":        "https://github.com/pmodels/mpich",
-    "Issues":        "https://github.com/pmodels/mpich/issues",
-    "Discussions":   "https://github.com/pmodels/mpich/discussions",
-}
 
 prefix = os.environ.get("PREFIX", f"/opt/{mpiname}")
 basedir = os.path.dirname(__file__)
@@ -45,11 +49,16 @@ destdir = os.environ.get("DESTDIR", f"{basedir}/install")
 rootdir = f"{destdir}{prefix}"
 
 with open(f"{rootdir}/include/mpi.h") as fobj:
-    version = version_re.search(fobj.read()).groups()[0]
-data_files = [
-    (subdir, glob.glob(f"{rootdir}/{subdir}/*"))
-    for subdir in ("include", "bin", "lib")
-]
+    version = ".".join(version_re.search(fobj.read()).groups())
+
+data_files = []
+for path, dirs, files in os.walk(rootdir):
+    dirs.sort()
+    files.sort()
+    subdir = os.path.relpath(path, rootdir)
+    filelist = [os.path.join(path, f) for f in files]
+    data_files.append((subdir, filelist))
+
 cmdclass = {
     "bdist_wheel": bdist_wheel,
 }
