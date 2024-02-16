@@ -65,6 +65,12 @@ if test "$mpiname" = "mpich"; then
     libraries=(
         "$data"/lib/libmpi.*
     )
+    if test "$variant" = "ucx"; then
+        libraries+=(
+            "$data"/lib/libuc[mpst]*.*
+            "$data"/lib/ucx/libuc*.*
+        )
+    fi
 fi
 
 check-dso() {

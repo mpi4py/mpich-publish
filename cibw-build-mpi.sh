@@ -81,8 +81,8 @@ cd "${DESTDIR}${PREFIX}"
 rm -f  bin/io_demo
 rm -f  bin/ucx_read_profile
 rm -f  lib/libuc[mpst]*.la
+rm -f  lib/ucx/libuct_*.la
 rm -fr lib/cmake
-rm -fr lib/ucx
 
 cd "${DESTDIR}${PREFIX}/bin"
 for script in mpicc mpicxx; do
@@ -103,19 +103,28 @@ if test "$(uname)" = Linux; then
     done
     cd "${DESTDIR}${PREFIX}/lib"
     if test -f "$libmpi".*.*; then
-        rm "$libmpi" "${libmpi%.*}"
-        mv "$libmpi".*.* "$libmpi"
-        ln -s "$libmpi" "${libmpi%.*}"
+        mv "$(readlink "$libmpi")" "$libmpi"
+        ln -sf "$libmpi" "${libmpi%.*}"
     fi
     if test -f libucp.so; then
         patchelf --set-rpath "\$ORIGIN" "$libmpi"
         for lib in libuc[mpst]*.so.?; do
+            if test -f "$lib".*; then
+                mv "$(readlink "$lib")" "$lib"
+                ln -sf "$lib" "${lib%.*}"
+            fi
             patchelf --set-rpath "\$ORIGIN" "$lib"
-        done
-        for exe in mpichversion mpivars; do
-            for lib in libuc[mpst].so.?; do
+            for exe in mpichversion mpivars; do
                 patchelf --remove-needed "$lib" "../bin/$exe"
             done
+        done
+        patchelf --add-rpath "\$ORIGIN/ucx" libuct.so.?
+        for lib in ucx/libuct_*.so.?; do
+            if test -f "$lib".*; then
+                mv "$(dirname "$lib")/$(readlink "$lib")" "$lib"
+                ln -srf "$lib" "${lib%.*}"
+            fi
+            patchelf --set-rpath "\$ORIGIN/.." "$lib"
         done
     fi
 fi
@@ -154,4 +163,5 @@ fi
 
 } # fixup-mpich()
 
+echo fixing install tree
 fixup-"$mpiname"
