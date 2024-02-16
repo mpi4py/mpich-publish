@@ -22,6 +22,7 @@ if test "$mpiname" = "mpich"; then
         --with-yaksa=embedded
         --disable-cxx
         --disable-static
+        --disable-doc
     )
     if test "$(uname)" = Darwin; then
         export MPICH_MPICC_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
@@ -52,8 +53,6 @@ cd "$WORKDIR"
 
 echo running configure
 "$SOURCE"/configure "${options[@]}" || cat config.log
-echo disabling manpages and documentation
-sed -i.orig 's/^\(install-data-local:\).*/\1/' Makefile
 
 echo running make with "${njobs:-1}" jobs
 make -j "${njobs:-1}" install DESTDIR="$DESTDIR"
