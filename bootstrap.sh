@@ -21,8 +21,6 @@ if test ! -d "$SOURCE"; then
     echo extracting "$tarball" to "$SOURCE"...
     tar xf "$tarball"
     mv "$mpiname-$version" "$SOURCE"
-    disable_doc='s/^\(INSTALL_DATA_LOCAL_TARGETS +=\)/#\1/g'
-    sed -i.orig "$disable_doc" "$SOURCE"/Makefile.am
 else
     echo reusing directory "$SOURCE"...
 fi

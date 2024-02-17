@@ -29,6 +29,8 @@ if test "$mpiname" = "mpich"; then
         export MPICH_MPICXX_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
         export MPICH_MPIFORT_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
     fi
+    disable_doc='s/^\(install-data-local:\s\+\)\$/\1#\$/'
+    sed -i.orig "$disable_doc" "$SOURCE"/Makefile.in
 fi
 
 
