@@ -6,6 +6,12 @@ permissions:
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
+      mpiname:
+        description: 'MPI'
+        default: 'mpich'
+        type: choice
+        options:
+          - mpich
       variant:
         description: 'Variant'
         default: ''
@@ -16,7 +22,7 @@ on:  # yamllint disable-line rule:truthy
           - ucx
       version:
         description: 'Version'
-        default: '4.1.2'
+        default: ''
         required: false
         type: string
       release:
@@ -48,6 +54,7 @@ jobs:
   wheel:
     uses: ./.github/workflows/cd-wheel.yml
     with:
+      mpiname: ${{ inputs.mpiname }}
       variant: ${{ inputs.variant }}
       version: ${{ inputs.version }}
       release: ${{ inputs.release }}
@@ -59,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: anaconda
-      url:  https://anaconda.org/mpi4py/mpich
+      url:  https://anaconda.org/mpi4py/${{ inputs.mpiname }}
 
     steps:
 

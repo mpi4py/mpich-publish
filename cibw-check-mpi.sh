@@ -29,12 +29,12 @@ ln -s helloworld.c helloworld.cxx
 
 RUN() { echo + "$@"; "$@"; }
 
-if test "$mpiname" == "mpich"; then
+if test "$mpiname" = "mpich"; then
     RUN command -v mpichversion
     RUN mpichversion
 fi
 
-if test "$mpiname" == "mpich"; then
+if test "$mpiname" = "mpich"; then
     RUN command -v mpivars
     RUN mpivars -nodesc | grep 'Category .* has'
 fi

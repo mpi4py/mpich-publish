@@ -10,6 +10,7 @@ DESTDIR=${DESTDIR:-$PWD/package/install}
 PREFIX=${PREFIX:-"/opt/$mpiname"}
 
 if test "$mpiname" = "mpich"; then
+    version=$(sed -n 's/MPICH_VERSION=\(.*\)/\1/p' "$SOURCE"/maint/Version)
     options=(
         CC=cc
         CXX=c++
@@ -24,7 +25,13 @@ if test "$mpiname" = "mpich"; then
         --disable-static
         --disable-doc
     )
+    if test "${version%%.*}" -lt 4; then
+        options=("${options[@]/--disable-cxx}")
+        export FCFLAGS=-fallow-argument-mismatch
+        export FFLAGS=-fallow-argument-mismatch
+    fi
     if test "$(uname)" = Darwin; then
+        options+=(--disable-opencl --disable-libxml2)
         export MPICH_MPICC_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
         export MPICH_MPICXX_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
         export MPICH_MPIFORT_LDFLAGS="-Wl,-rpath,$PREFIX/lib"
@@ -65,6 +72,7 @@ cd "${DESTDIR}${PREFIX}"
 rm -f  include/*cxx.h
 rm -f  include/*.mod
 rm -f  include/*f.h
+rm -fr include/rdma
 rm -f  bin/mpif77
 rm -f  bin/mpif90
 rm -f  bin/mpifort
@@ -86,22 +94,33 @@ rm -f  lib/libuc[mpst]*.la
 rm -f  lib/ucx/libuct_*.la
 rm -fr lib/cmake
 
+headers=(mpi.h)
+scripts=(mpicc mpicxx)
+executables=(mpichversion mpivars)
+
+cd "${DESTDIR}${PREFIX}/include"
+for header in "${headers[@]}"; do
+    sed -i.orig 's:^#include "mpicxx.h"::g' "$header"
+    rm "$header".orig
+done
+
 cd "${DESTDIR}${PREFIX}/bin"
-for script in mpicc mpicxx; do
+for script in "${scripts[@]}"; do
     # shellcheck disable=SC2016
     topdir='$(CDPATH= cd -- "$(dirname -- "$0")/.." \&\& pwd -P)'
-    sed -i.orig s:^prefix=.*:prefix="$topdir": $script
-    sed -i.orig s:"$PREFIX":\"\$\{prefix\}\":g $script
-    sed -i.orig s:-Wl,-commons,use_dylibs::g $script
-    sed -i.orig s:/usr/bin/bash:/bin/bash:g $script
-    rm $script.orig
+    sed -i.orig s:^prefix=.*:prefix="$topdir": "$script"
+    sed -i.orig s:"$PREFIX":\"\$\{prefix\}\":g "$script"
+    sed -i.orig s:-Wl,-commons,use_dylibs::g "$script"
+    sed -i.orig s:/usr/bin/bash:/bin/bash:g "$script"
+    sed -i.orig s:-lmpicxx::g "$script"
+    rm "$script".orig
 done
 
 if test "$(uname)" = Linux; then
     libmpi="libmpi.so.12"
     cd "${DESTDIR}${PREFIX}/bin"
-    for exe in mpichversion mpivars; do
-        patchelf --set-rpath "\$ORIGIN/../lib" $exe
+    for exe in "${executables[@]}"; do
+        patchelf --set-rpath "\$ORIGIN/../lib" "$exe"
     done
     cd "${DESTDIR}${PREFIX}/lib"
     if test -f "$libmpi".*.*; then
@@ -116,7 +135,7 @@ if test "$(uname)" = Linux; then
                 ln -sf "$lib" "${lib%.*}"
             fi
             patchelf --set-rpath "\$ORIGIN" "$lib"
-            for exe in mpichversion mpivars; do
+            for exe in "${executables[@]}"; do
                 patchelf --remove-needed "$lib" "../bin/$exe"
             done
         done
@@ -136,7 +155,7 @@ if test "$(uname)" = Darwin; then
     libmpi="libmpi.12.dylib"
     libpmpi="libpmpi.12.dylib"
     cd "${DESTDIR}${PREFIX}/bin"
-    for exe in mpichversion mpivars; do
+    for exe in "${executables[@]}"; do
         install_name_tool -change "$libdir/$libmpi" "@rpath/$libmpi" "$exe"
         install_name_tool -change "$libdir/$libpmpi" "@rpath/$libpmpi" "$exe"
         install_name_tool -add_rpath "@executable_path/../lib/" "$exe"
@@ -147,20 +166,6 @@ if test "$(uname)" = Darwin; then
         install_name_tool -add_rpath "@loader_path/" "$lib"
     done
     install_name_tool -change "$libdir/$libpmpi" "@rpath/$libpmpi" "$libmpi"
-    if test -f libucp.dylib; then  # TODO: UCX is not supported on macOS
-        for lib in libuc[mpst]*.?.dylib; do
-            install_name_tool -id "@rpath/$lib" "$lib"
-            install_name_tool -add_rpath "@loader_path/" "$lib"
-            for dep in libuc[mst].?.dylib; do
-                install_name_tool -change "$libdir/$dep" "@rpath/$dep" "$lib"
-            done
-        done
-        for exe in mpichversion mpivars; do
-            for dep in libuc[mpst].?.dylib; do
-                install_name_tool -change "$libdir/$dep" "/" "../bin/$exe"
-            done
-        done
-    fi
 fi
 
 } # fixup-mpich()
