@@ -1,12 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-mpiname="${MPINAME:-mpich}"
-variant="${VARIANT:-}"
-test -z "$variant" \
-    && pkgname="${mpiname}" \
-    || pkgname="${mpiname}_${variant}"
-
 wheelhouse="${1:-wheelhouse}"
 ls -d "$wheelhouse" > /dev/null
 
@@ -15,11 +9,17 @@ tempdir=$(mktemp -d)
 workdir=$tempdir/wheel
 trap 'rm -rf $tempdir' EXIT
 
-for wheelfile in "$wheelhouse/$pkgname"-*.whl; do
+for wheelfile in "$wheelhouse"/*.whl; do
 cd "$savedir" && rm -rf "$workdir"
 unzip -vv "$wheelfile"
 unzip -qq "$wheelfile" -d "$workdir"
 cd "$workdir"
+
+whlname=$(basename "$wheelfile")
+pkgname=${whlname%%-*}
+mpiname=${pkgname%_*}
+variant=${pkgname#"${mpiname}"}
+variant=${variant#_}
 
 data=$(ls -d "$pkgname"-*.data/data)
 if test "$(uname)" = Linux; then
