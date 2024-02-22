@@ -12,14 +12,6 @@ on:  # yamllint disable-line rule:truthy
         type: choice
         options:
           - mpich
-      variant:
-        description: 'Variant'
-        default: ''
-        type: choice
-        options:
-          - ''
-          - ofi
-          - ucx
       version:
         description: 'Version'
         default: ''
@@ -30,6 +22,14 @@ on:  # yamllint disable-line rule:truthy
         default: ''
         required: false
         type: string
+      variant:
+        description: 'Build variant'
+        default: ''
+        type: choice
+        options:
+          - ''
+          - ofi
+          - ucx
       os-arch:
         description: "Target OS-Architecture"
         default: all
@@ -55,9 +55,9 @@ jobs:
     uses: ./.github/workflows/cd-wheel.yml
     with:
       mpiname: ${{ inputs.mpiname }}
-      variant: ${{ inputs.variant }}
       version: ${{ inputs.version }}
       release: ${{ inputs.release }}
+      variant: ${{ inputs.variant }}
       os-arch: ${{ inputs.os-arch }}
 
   publish-anaconda:

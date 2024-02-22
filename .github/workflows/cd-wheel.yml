@@ -11,11 +11,6 @@ on:  # yamllint disable-line rule:truthy
         default: 'mpich'
         required: false
         type: string
-      variant:
-        description: 'Variant'
-        default: ''
-        required: false
-        type: string
       version:
         description: 'Version'
         default: ''
@@ -23,6 +18,11 @@ on:  # yamllint disable-line rule:truthy
         type: string
       release:
         description: 'Release number'
+        default: ''
+        required: false
+        type: string
+      variant:
+        description: 'Build variant'
         default: ''
         required: false
         type: string
@@ -39,14 +39,6 @@ on:  # yamllint disable-line rule:truthy
         type: choice
         options:
           - mpich
-      variant:
-        description: 'Variant'
-        default: ''
-        type: choice
-        options:
-          - ''
-          - ofi
-          - ucx
       version:
         description: 'Version'
         default: ''
@@ -57,6 +49,14 @@ on:  # yamllint disable-line rule:truthy
         default: ''
         required: false
         type: string
+      variant:
+        description: 'Build variant'
+        default: ''
+        type: choice
+        options:
+          - ''
+          - ofi
+          - ucx
       os-arch:
         description: "Target OS-Architecture"
         default: Linux-x86_64
@@ -74,9 +74,9 @@ on:  # yamllint disable-line rule:truthy
 
 env:
   MPINAME: '${{ inputs.mpiname }}'
-  VARIANT: '${{ inputs.variant }}'
   VERSION: '${{ inputs.version }}'
   RELEASE: '${{ inputs.release }}'
+  VARIANT: '${{ inputs.variant }}'
 
 jobs:
 
