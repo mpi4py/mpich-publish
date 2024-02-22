@@ -28,6 +28,7 @@ if test "$(uname)" = Linux; then
     soregex='\.so\..*'
     runlibs='lib(mpi|c|m|dl|rt|pthread)'$soregex
     runlibs=$runlibs'|(ld-linux-.*|ld64)'$soregex
+    libsdir=.libs
     print-runpath() { patchelf --print-rpath  "$1"; }
     print-needed()  { patchelf --print-needed "$1"; }
     if test -f "$data"/lib/libucp.so; then
@@ -39,6 +40,7 @@ if test "$(uname)" = Darwin; then
     soregex='\..*\.dylib'
     runlibs='lib(mpi|pmpi|System)'$soregex
     runlibs=$runlibs'|(Foundation|IOKit)\.framework'
+    libsdir=.dylibs
     print-runpath() { otool -l "$1" | sed -n '/RPATH/{n;n;p;}'; }
     print-needed()  { otool -L "$1" | sed 1,1d; }
     if test -f "$data"/lib/libucp.dylib; then
@@ -56,6 +58,7 @@ if test "$mpiname" = "mpich"; then
         "$data"/bin/mpic++
         "$data"/bin/mpicxx
     )
+    wrappers=()
     programs=(
         "$data"/bin/mpichversion
         "$data"/bin/mpivars
@@ -74,7 +77,32 @@ if test "$mpiname" = "mpich"; then
     fi
 fi
 
-check-dso() {
+if test "$mpiname" = "openmpi"; then
+    headers=(
+        "$data"/include/mpi.h
+    )
+    scripts=()
+    wrappers=(
+        "$data"/bin/mpicc
+        "$data"/bin/mpic++
+        "$data"/bin/mpicxx
+        "$data"/bin/mpiCC
+        "$data"/bin/mpirun
+        "$data"/bin/mpiexec
+    )
+    programs=(
+        "$data"/bin/*_info
+        "$data"/bin/*_wrapper
+    )
+    libraries=(
+        "$data"/lib/libmpi.*
+        "$data"/lib/libopen-*.*
+    )
+    runlibs+='|lib(z|util|event.*|hwloc)'$soregex
+    runlibs+='|lib(open-(pal|rte)|pmix|prrte)'$soregex
+fi
+
+check-binary() {
     local dso=$1 out1="" out2=""
     echo checking "$dso"...
     test -f "$dso" || printf "ERROR: file not found\n"
@@ -85,29 +113,37 @@ check-dso() {
     test -z "$out1" -a -z "$out2"
 }
 
-for header in "${headers[@]}"; do
+for header in "${headers[@]-}"; do
+    test -n "$header" || break
     echo checking "$header"...
     test -f "$header"
     out=$(grep -E '^#include\s+"mpicxx\.h"' "$header" || true)
     test -z "$out" || printf "ERROR: include\n%s\n" "$out"
     test -z "$out"
 done
-for script in "${scripts[@]}"; do
+for script in "${scripts[@]-}"; do
+    test -n "$script" || break
     echo checking "$script"...
     test -f "$script"
     out=$(grep -E "/opt/$mpiname" "$script" || true)
     test -z "$out" || printf "ERROR: prefix\n%s\n" "$out"
     test -z "$out"
 done
-for bin in "${programs[@]}"; do
-    check-dso "$bin"
+for bin in "${wrappers[@]-}"; do
+    test -n "$bin" || break
+    check-binary "$bin"
 done
-for lib in "${libraries[@]}"; do
-    check-dso "$lib"
+for bin in "${programs[@]-}"; do
+    test -n "$bin" || break
+    check-binary "$bin"
 done
-if test "$(uname)" = Linux; then
-    echo checking "$pkgname".libs...
-    out=$(ls -A "$pkgname".libs)
+for lib in "${libraries[@]-}"; do
+    test -n "$lib" || break
+    check-binary "$lib"
+done
+if test -d "$pkgname$libsdir"; then
+    echo checking "$pkgname$libsdir"...
+    out=$(ls -A "$pkgname$libsdir")
     test -z "$out" || printf "ERROR: library\n%s\n" "$out"
     test -z "$out"
 fi

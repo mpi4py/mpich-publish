@@ -7,13 +7,14 @@ on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
       mpiname:
-        description: 'MPI'
+        description: 'MPI Name'
         default: 'mpich'
         type: choice
         options:
           - mpich
+          - openmpi
       version:
-        description: 'Version'
+        description: 'MPI Version'
         default: ''
         required: false
         type: string

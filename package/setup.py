@@ -38,6 +38,25 @@ if mpiname == "mpich":
         "Discussions":   "https://github.com/pmodels/mpich/discussions",
     }
 
+if mpiname == "openmpi":
+    project = "Open MPI"
+    version_re = re.compile(r"""
+    \#define\s+OMPI_MAJOR_VERSION\s+(\d+)\n
+    \#define\s+OMPI_MINOR_VERSION\s+(\d+)\n
+    \#define\s+OMPI_RELEASE_VERSION\s+(\d+)\n
+    """, re.VERBOSE)
+    license = "LicenseRef-OpenMPI"
+    author = "Open MPI Team"
+    author_email = "users@lists.open-mpi.org"
+    project_urls = {
+        "Homepage":      "https://www.open-mpi.org",
+        "Downloads":     "https://www.open-mpi.org/software/",
+        "Documentation": "https://www.open-mpi.org/doc/",
+        "Source":        "https://github.com/open-mpi/ompi",
+        "Issues":        "https://github.com/open-mpi/ompi/issues",
+        "Discussions":   "https://github.com/open-mpi/ompi/discussions",
+    }
+
 description = "A high performance implementation of MPI"
 long_description = f"""`{project} <{project_urls["Homepage"]}>`_ is a
 high-performance and widely portable implementation of the Message

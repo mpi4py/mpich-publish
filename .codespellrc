@@ -1,0 +1,4 @@
+# https://github.com/codespell-project/codespell #-*- mode: conf -*-
+
+[codespell]
+ignore-words-list = pevent

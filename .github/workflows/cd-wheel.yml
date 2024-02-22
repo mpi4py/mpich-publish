@@ -7,12 +7,12 @@ on:  # yamllint disable-line rule:truthy
   workflow_call:
     inputs:
       mpiname:
-        description: 'MPI'
+        description: 'MPI Name'
         default: 'mpich'
         required: false
         type: string
       version:
-        description: 'Version'
+        description: 'MPI Version'
         default: ''
         required: false
         type: string
@@ -39,6 +39,7 @@ on:  # yamllint disable-line rule:truthy
         type: choice
         options:
           - mpich
+          - openmpi
       version:
         description: 'Version'
         default: ''
@@ -122,13 +123,20 @@ jobs:
     - id: checkout
       uses: actions/checkout@v4
 
-    - id: setup-gfortran
+    - id: setup-macOS
       if: ${{ runner.os == 'macOS' }}
+      name: setup-macOS
       run: |
         # create gfortran symlink
         cd $(brew --prefix)/bin
         gfortran=$(ls gfortran-* | sort | head -n 1)
         sudo ln -s $gfortran gfortran
+        # install autotools
+        brew install autoconf
+        brew install automake
+        brew install libtool
+        # unlink libevent
+        brew unlink libevent || true
 
     - id: setup-python
       uses: actions/setup-python@v5
