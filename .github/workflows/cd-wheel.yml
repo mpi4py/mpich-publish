@@ -96,7 +96,7 @@ jobs:
             ("Linux", "ppc64le", "ubuntu-22.04"),
             ("Linux", "x86_64",  "ubuntu-22.04"),
             ("macOS", "arm64",   "macos-14"),
-            ("macOS", "x86_64",  "macos-11"),
+            ("macOS", "x86_64",  "macos-12"),
         ]
         os, _, arch = "${{ inputs.os-arch }}".partition("-")
         if os not in ("", "*", "all"):
