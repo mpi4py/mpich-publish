@@ -15,7 +15,7 @@ if test "$mpiname" = "mpich"; then
 fi
 
 if test "$mpiname" = "openmpi"; then
-    version=${VERSION:-5.0.3}
+    version=${VERSION:-5.0.4}
     urlbase=https://download.open-mpi.org/release/open-mpi/v${version%.*}
     tarball="$mpiname-$version.tar.gz"
     license=LICENSE
