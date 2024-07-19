@@ -31,6 +31,10 @@ if test ! -d "$SOURCE"; then
     echo extracting "$tarball" to "$SOURCE"...
     tar xf "$tarball"
     mv "$mpiname-$version" "$SOURCE"
+    patch="$PROJECT/patches/$mpiname-$version"
+    if test -f "$patch"; then
+        patch -p1 -i "$patch" -d "$SOURCE"
+    fi
     if test "$mpiname-$(uname)" = "openmpi-Darwin"; then
         if test -d "$SOURCE"/3rd-party; then
             cd "$SOURCE"/3rd-party
@@ -44,4 +48,4 @@ else
     echo reusing directory "$SOURCE"...
 fi
 echo copying license file...
-cp "$SOURCE"/"$license" "package/LICENSE"
+cp "$SOURCE"/"$license" "$PACKAGE/LICENSE"
