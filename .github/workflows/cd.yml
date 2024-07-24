@@ -90,7 +90,7 @@ jobs:
       uses: mamba-org/setup-micromamba@v1
       with:
         environment-name: ac
-        create-args: anaconda-client python=3.11
+        create-args: anaconda-client
 
     - name: Publish to Anaconda
       run:  |
