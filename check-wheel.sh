@@ -38,7 +38,7 @@ fi
 if test "$(uname)" = Darwin; then
     runpath='@executable_path/../lib/|@loader_path/'
     soregex='\..*\.dylib'
-    runlibs='lib(mpi|pmpi|System)'$soregex
+    runlibs='lib(mpi|pmpi|System|objc)'$soregex
     runlibs=$runlibs'|(Foundation|IOKit)\.framework'
     libsdir=.dylibs
     print-runpath() { otool -l "$1" | sed -n '/RPATH/{n;n;p;}'; }
