@@ -1,0 +1,21 @@
+name: ci
+
+permissions:
+  contents: read
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+    branches:
+      - master
+
+jobs:
+
+  mpich:
+    uses: ./.github/workflows/cd-wheel.yml
+    with:
+      mpiname: mpich
+
+  openmpi:
+    uses: ./.github/workflows/cd-wheel.yml
+    with:
+      mpiname: openmpi
