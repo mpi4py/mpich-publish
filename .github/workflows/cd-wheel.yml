@@ -202,7 +202,7 @@ jobs:
     - id: upload
       uses: actions/upload-artifact@v4
       with:
-        name: wheel-${{ matrix.os }}-${{ matrix.arch }}
+        name: wheel-${{ inputs.mpiname }}-${{ matrix.os }}-${{ matrix.arch }}
         path: wheelhouse/*.whl
 
     - id: check
