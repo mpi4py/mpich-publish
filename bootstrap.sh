@@ -8,7 +8,7 @@ PACKAGE=$PROJECT/package
 SOURCE=$PACKAGE/source
 
 if test "$mpiname" = "mpich"; then
-    version=${VERSION:-4.2.2}
+    version=${VERSION:-4.2.3}
     urlbase="https://www.mpich.org/static/downloads/$version"
     tarball="$mpiname-$version.tar.gz"
     license=COPYRIGHT
