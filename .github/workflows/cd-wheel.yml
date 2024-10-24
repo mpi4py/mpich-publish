@@ -137,6 +137,8 @@ jobs:
         brew install libtool
         # unlink libevent
         brew unlink libevent || true
+        # install uv
+        brew install uv
 
     - id: setup-python
       uses: actions/setup-python@v5
@@ -165,7 +167,7 @@ jobs:
         package-dir: package
         output-dir:  wheelhouse
       env:
-        CIBW_BUILD_FRONTEND: "build"
+        CIBW_BUILD_FRONTEND: "build[uv]"
         CIBW_BUILD: "cp312-*"
         CIBW_SKIP:  "*musllinux*"
         CIBW_ARCHS: "${{ matrix.arch }}"

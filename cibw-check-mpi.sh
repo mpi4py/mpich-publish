@@ -1,8 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-pkgname=$(pip list | awk '/mpich|openmpi/ {print $1}')
-mpiname=${pkgname%_*}
+mpiname="${MPINAME:-mpich}"
 
 tempdir="$(mktemp -d)"
 trap 'rm -rf $tempdir' EXIT
