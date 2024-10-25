@@ -2,20 +2,23 @@
 set -euo pipefail
 
 mpiname=${MPINAME:-mpich}
+case "$mpiname" in
+    mpich)   version=4.2.3 ;;
+    openmpi) version=5.0.5 ;;
+esac
+version=${VERSION:-$version}
 
 PROJECT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PACKAGE=$PROJECT/package
 SOURCE=$PACKAGE/source
 
 if test "$mpiname" = "mpich"; then
-    version=${VERSION:-4.2.3}
     urlbase="https://www.mpich.org/static/downloads/$version"
     tarball="$mpiname-$version.tar.gz"
     license=COPYRIGHT
 fi
 
 if test "$mpiname" = "openmpi"; then
-    version=${VERSION:-5.0.5}
     urlbase=https://download.open-mpi.org/release/open-mpi/v${version%.*}
     tarball="$mpiname-$version.tar.gz"
     license=LICENSE
