@@ -17,9 +17,7 @@ cd "$workdir"
 
 whlname=$(basename "$wheelfile")
 pkgname=${whlname%%-*}
-mpiname=${pkgname%_*}
-variant=${pkgname#"${mpiname}"}
-variant=${variant#_}
+mpiname=${pkgname}
 
 data=$(ls -d "$pkgname"-*.data/data)
 if test "$(uname)" = Linux; then
@@ -69,7 +67,7 @@ if test "$mpiname" = "mpich"; then
     libraries=(
         "$data"/lib/libmpi.*
     )
-    if test "$variant" = "ucx"; then
+    if test -d "$data"/lib/ucx; then
         libraries+=(
             "$data"/lib/libuc[mpst]*.*
             "$data"/lib/ucx/libuc*.*

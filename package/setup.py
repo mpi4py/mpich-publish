@@ -17,9 +17,8 @@ class bdist_wheel(bdist_wheel):
 
 
 mpiname = os.environ.get("MPINAME", "mpich")
-variant = os.environ.get("VARIANT", "")
 release = os.environ.get("RELEASE", "")
-pkgname = f"{mpiname}-{variant}" if variant else mpiname
+pkgname = mpiname
 
 if mpiname == "mpich":
     project = "MPICH"

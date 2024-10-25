@@ -23,14 +23,6 @@ on:  # yamllint disable-line rule:truthy
         default: ''
         required: false
         type: string
-      variant:
-        description: 'Build variant'
-        default: ''
-        type: choice
-        options:
-          - ''
-          - ofi
-          - ucx
       os-arch:
         description: "Target OS-Architecture"
         default: all
@@ -58,7 +50,6 @@ jobs:
       mpiname: ${{ inputs.mpiname }}
       version: ${{ inputs.version }}
       release: ${{ inputs.release }}
-      variant: ${{ inputs.variant }}
       os-arch: ${{ inputs.os-arch }}
 
   publish-anaconda:
