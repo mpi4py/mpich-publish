@@ -6,7 +6,7 @@ build:
 lint:
 	codespell *.sh */*.py
 	shellcheck *.sh
-	ruff -n package/*.py
+	ruff check -qn package/*.py
 	yamllint .github/
 
 clean:
