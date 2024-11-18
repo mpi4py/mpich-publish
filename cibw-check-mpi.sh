@@ -36,6 +36,7 @@ if test "$mpiname" = "openmpi"; then
     export OMPI_MCA_mpi_yield_when_idle=true
     export OMPI_MCA_rmaps_base_oversubscribe=true
     export OMPI_MCA_rmaps_default_mapping_policy=:oversubscribe
+    export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
 fi
 
 export MPIEXEC_TIMEOUT=60
