@@ -147,7 +147,7 @@ jobs:
         echo $(git log -1 --pretty=%ci) [timestamp=$SOURCE_DATE_EPOCH]
 
     - id: build
-      uses: pypa/cibuildwheel@v2.21.3
+      uses: pypa/cibuildwheel@v2.22.0
       timeout-minutes: 360
       with:
         package-dir: package
