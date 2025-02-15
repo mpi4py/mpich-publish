@@ -20,7 +20,11 @@ int main(int argc, char *argv[])
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(name, &len);
+  if (rank != 0)
+    MPI_Recv(name, 0 , MPI_BYTE, rank-1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   printf("Hello, World! I am process %d of %d on %s.\n", rank, size, name);
+  if (rank != size - 1)
+    MPI_Send(name, 0 , MPI_BYTE, rank+1, 0, MPI_COMM_WORLD);
   MPI_Finalize();
   return 0;
 }
@@ -56,6 +60,14 @@ fi
 if test "$mpiname" = "openmpi"; then
     RUN command -v ompi_info
     RUN ompi_info
+    if command -v pmix_info > /dev/null; then
+        RUN command -v pmix_info
+        RUN pmix_info
+    fi
+    if command -v prte_info > /dev/null; then
+        RUN command -v prte_info
+        RUN prte_info
+    fi
 fi
 
 RUN command -v mpicc
@@ -69,3 +81,23 @@ RUN mpicxx helloworld.cxx -o helloworld-cxx
 RUN command -v mpiexec
 RUN mpiexec -n 3 ./helloworld-c
 RUN mpiexec -n 3 ./helloworld-cxx
+
+if test "$mpiname" = "mpich"; then
+    version=$(mpichversion --version | cut -d':' -f 2)
+    case $(uname) in
+        Linux)  ch4netmods=(ofi ucx) ;;
+        Darwin) ch4netmods=(ofi) ;;
+    esac
+    export MPICH_CH4_UCX_CAPABILITY_DEBUG=1
+    export MPICH_CH4_OFI_CAPABILITY_DEBUG=1
+    for netmod in "${ch4netmods[@]}"; do
+        printf "testing ch4:%s ... " "$netmod"
+        export MPICH_CH4_NETMOD="$netmod"
+        test "${version%%.*}" -ge 4 || netmod=""
+        ./helloworld-c | grep -i "$netmod" > /dev/null
+        printf "OK\n"
+    done
+    unset MPICH_CH4_UCX_CAPABILITY_DEBUG
+    unset MPICH_CH4_OFI_CAPABILITY_DEBUG
+    unset MPICH_CH4_NETMOD
+fi

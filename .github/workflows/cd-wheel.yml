@@ -54,7 +54,6 @@ on:  # yamllint disable-line rule:truthy
           - all
           - Linux
           - Linux-aarch64
-          - Linux-ppc64le
           - Linux-x86_64
           - macOS
           - macOS-arm64
@@ -76,11 +75,11 @@ jobs:
       shell: python
       name: 'setup build matrix'
       run: |
+        # setup build matrix # "
         keys = ("os", "arch", "runner")
         rows = [
-            ("Linux", "aarch64", "ubuntu-22.04"),
-            ("Linux", "ppc64le", "ubuntu-22.04"),
-            ("Linux", "x86_64",  "ubuntu-22.04"),
+            ("Linux", "aarch64", "ubuntu-24.04-arm"),
+            ("Linux", "x86_64",  "ubuntu-24.04"),
             ("macOS", "arm64",   "macos-14"),
             ("macOS", "x86_64",  "macos-13"),
         ]
@@ -93,6 +92,7 @@ jobs:
         import os, json
         with open(os.getenv("GITHUB_OUTPUT"), "w") as out:
             print(f"matrix={json.dumps(matrix)}", file=out)
+        # "
 
   build:
     needs: setup
@@ -113,16 +113,21 @@ jobs:
       if: ${{ runner.os == 'macOS' }}
       name: setup-macOS
       run: |
+        # set macOS deployment target
+        case $(uname -m) in
+        arm64)  echo MACOSX_DEPLOYMENT_TARGET=11.0  >> $GITHUB_ENV ;;
+        x86_64) echo MACOSX_DEPLOYMENT_TARGET=10.15 >> $GITHUB_ENV ;;
+        esac
         # create gfortran symlink
         cd $(brew --prefix)/bin
         gfortran=$(ls gfortran-* | sort | head -n 1)
         sudo ln -s $gfortran gfortran
+        # unlink libevent
+        brew unlink libevent || true
         # install autotools
         brew install autoconf
         brew install automake
         brew install libtool
-        # unlink libevent
-        brew unlink libevent || true
         # install uv
         brew install uv
 
@@ -131,20 +136,19 @@ jobs:
       with:
         python-version: 3
 
-    - id: setup-qemu
-      if: ${{ runner.os == 'Linux' }}
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: all
-
     - id: bootstrap
       run: ./bootstrap.sh
 
     - id: source-date-epoch
       run: |
-        SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
+        read -r SOURCE_DATE_EPOCH < source-date-epoch || true
+        SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --pretty=%ct)}
         echo SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH >> $GITHUB_ENV
-        echo $(git log -1 --pretty=%ci) [timestamp=$SOURCE_DATE_EPOCH]
+        test $(uname) = Darwin && (echo ZERO_AR_DATE=1 >> $GITHUB_ENV)
+        echo [SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH] $(
+        date -u -d @$SOURCE_DATE_EPOCH 2>/dev/null ||
+        date -u -r  $SOURCE_DATE_EPOCH 2>/dev/null )
+      working-directory: package/source
 
     - id: build
       uses: pypa/cibuildwheel@v2.22.0
@@ -154,11 +158,13 @@ jobs:
         output-dir:  wheelhouse
       env:
         CIBW_BUILD_FRONTEND: "build[uv]"
-        CIBW_BUILD: "cp312-*"
+        CIBW_BUILD: "cp313-*"
         CIBW_SKIP:  "*musllinux*"
         CIBW_ARCHS: "${{ matrix.arch }}"
         CIBW_BEFORE_ALL: >-
           bash {project}/cibw-build-mpi.sh
+        CIBW_BEFORE_BUILD: >-
+          bash {project}/cibw-patch-cmd.sh
         CIBW_TEST_COMMAND: >-
           bash {project}/cibw-check-mpi.sh
         CIBW_ENVIRONMENT_PASS: >-
@@ -171,12 +177,8 @@ jobs:
           SOURCE="$PWD/package/source"
           WORKDIR="$PWD/package/workdir"
           DESTDIR="$PWD/package/install"
-        CIBW_REPAIR_WHEEL_COMMAND_MACOS: >
-          delocate-wheel
-          --ignore-missing-dependencies
-          --exclude libmpi --exclude libpmpi
-          --require-archs {delocate_archs}
-          -w {dest_dir} -v {wheel}
+        CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+        CIBW_MANYLINUX_X86_64_IMAGE:  manylinux_2_28
 
     - id: sha256sum
       run: |
@@ -190,8 +192,24 @@ jobs:
     - id: upload
       uses: actions/upload-artifact@v4
       with:
-        name: wheel-${{ inputs.mpiname }}-${{ matrix.os }}-${{ matrix.arch }}
+        name: "wheel-${{ inputs.mpiname }}-\
+              ${{ inputs.version || 'latest' }}-\
+              ${{ matrix.os }}-${{ matrix.arch }}"
         path: wheelhouse/*.whl
 
     - id: check
-      run: ./check-wheel.sh wheelhouse
+      run: ./wheel-check.sh wheelhouse
+
+    - id: test
+      run: |
+        # ./wheel-test.sh
+        test $(uname) = Linux && runner=(
+        docker run
+        -e MPINAME=${{ inputs.mpiname }}
+        -v $(pwd):/${{ github.workspace }}
+        -w ${{ github.workspace }}
+        --platform linux/${{
+        matrix.arch == 'aarch64' && 'arm64' ||
+        matrix.arch == 'x86_64'  && 'amd64'
+        }} python:3)
+        ${runner[@]:-} ./wheel-test.sh wheelhouse

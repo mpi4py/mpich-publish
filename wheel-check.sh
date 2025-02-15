@@ -16,7 +16,9 @@ unzip -qq "$wheelfile" -d "$workdir"
 cd "$workdir"
 
 whlname=$(basename "$wheelfile")
-pkgname=${whlname%%-*}
+whlinfo=${whlname%%-py*}
+pkgname=${whlinfo%%-*}
+version=${whlinfo##*-}
 mpiname=${pkgname}
 
 data=$(ls -d "$pkgname"-*.data/data)
@@ -29,8 +31,11 @@ if test "$(uname)" = Linux; then
     libsdir=.libs
     print-runpath() { patchelf --print-rpath  "$1"; }
     print-needed()  { patchelf --print-needed "$1"; }
-    if test -f "$data"/lib/libucp.so; then
+    if test -f "$data"/lib/*/libucp.so.*; then
         runlibs=$runlibs'|libuc(m|p|s|t)'$soregex
+    fi
+    if test -f "$data"/lib/*/libfabric.so.*; then
+        runlibs=$runlibs'|libfabric'$soregex
     fi
 fi
 if test "$(uname)" = Darwin; then
@@ -41,8 +46,11 @@ if test "$(uname)" = Darwin; then
     libsdir=.dylibs
     print-runpath() { otool -l "$1" | sed -n '/RPATH/{n;n;p;}'; }
     print-needed()  { otool -L "$1" | sed 1,1d; }
-    if test -f "$data"/lib/libucp.dylib; then
+    if test -f "$data"/lib/libucp.*.dylib; then
         runlibs=$runlibs'|libuc(m|p|s|t)'$soregex
+    fi
+    if test -f "$data"/lib/libfabric.*.dylib; then
+        runlibs=$runlibs'|libfabric'$soregex
     fi
 fi
 
@@ -65,12 +73,17 @@ if test "$mpiname" = "mpich"; then
         "$data"/bin/hydra_*
     )
     libraries=(
-        "$data"/lib/libmpi.*
+        "$data"/lib/lib*mpi.*
     )
-    if test -d "$data"/lib/ucx; then
+    if ls "$data"/lib/*/libfabric.* > /dev/null 2>&1; then
         libraries+=(
-            "$data"/lib/libuc[mpst]*.*
-            "$data"/lib/ucx/libuc*.*
+            "$data"/lib/*/libfabric.*
+        )
+    fi
+    if ls "$data"/lib/*/libucp.* > /dev/null 2>&1; then
+        libraries+=(
+            "$data"/lib/*/libuc[mpst]*.*
+            "$data"/lib/*/ucx/libuc[mpst]*.*
         )
     fi
 fi
@@ -96,6 +109,25 @@ if test "$mpiname" = "openmpi"; then
         "$data"/lib/libmpi.*
         "$data"/lib/libopen-*.*
     )
+    if test "${version%%.*}" -ge 5; then
+        libraries+=(
+            "$data"/lib/openmpi/libevent*.*
+            "$data"/lib/openmpi/libhwloc.*
+            "$data"/lib/openmpi/libpmix.*
+            "$data"/lib/openmpi/libprrte.*
+        )
+    fi
+    if ls "$data"/lib/*/libucp.* > /dev/null 2>&1; then
+        libraries+=(
+            "$data"/lib/*/libuc[mpst]*.*
+            "$data"/lib/*/ucx/libuc[mpst]*.*
+        )
+    fi
+    if ls "$data"/lib/*/libfabric.* > /dev/null 2>&1; then
+        libraries+=(
+            "$data"/lib/*/libfabric.*
+        )
+    fi
     runlibs+='|lib(z|util|event.*|hwloc)'$soregex
     runlibs+='|lib(open-(pal|rte)|pmix|prrte)'$soregex
 fi
@@ -103,18 +135,19 @@ fi
 check-binary() {
     local dso=$1 out1="" out2=""
     echo checking "$dso"...
-    test -f "$dso" || printf "ERROR: file not found\n"
+    test -f "$dso" || (printf "ERROR: file not found\n"; exit 1)
     out1="$(print-runpath "$dso" | grep -vE "$runpath" || true)"
     test -z "$out1" || printf "ERROR: RUNPATH\n%s\n" "$out1"
     out2="$(print-needed  "$dso" | grep -vE "$runlibs" || true)"
     test -z "$out2" || printf "ERROR: NEEDED\n%s\n" "$out2"
-    test -z "$out1" -a -z "$out2"
+    test -z "$out1"
+    test -z "$out2"
 }
 
 for header in "${headers[@]-}"; do
     test -n "$header" || break
     echo checking "$header"...
-    test -f "$header"
+    test -f "$header" || (printf "ERROR: file not found\n"; exit 1)
     out=$(grep -E '^#include\s+"mpicxx\.h"' "$header" || true)
     test -z "$out" || printf "ERROR: include\n%s\n" "$out"
     test -z "$out"
@@ -122,7 +155,7 @@ done
 for script in "${scripts[@]-}"; do
     test -n "$script" || break
     echo checking "$script"...
-    test -f "$script"
+    test -f "$script" || (printf "ERROR: file not found\n"; exit 1)
     out=$(grep -E "/opt/$mpiname" "$script" || true)
     test -z "$out" || printf "ERROR: prefix\n%s\n" "$out"
     test -z "$out"

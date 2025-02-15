@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
   (void) readlink("/proc/curproc/file", exe, PATH_MAX);
 #elif defined(__linux__)
   (void) readlink("/proc/self/exe", exe, PATH_MAX);
-#elif defined( __sun)
+#elif defined(__sun)
   (void) strncpy(exe, getexecname(), PATH_MAX);
 #else
 # error unknown system

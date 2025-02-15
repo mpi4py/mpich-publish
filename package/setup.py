@@ -1,5 +1,8 @@
 from setuptools import setup
-from wheel.bdist_wheel import bdist_wheel
+try:
+    from setuptools.command.bdist_wheel import bdist_wheel
+except ImportError:
+    from wheel.bdist_wheel import bdist_wheel
 import re
 import os
 
@@ -9,22 +12,26 @@ class bdist_wheel(bdist_wheel):
     def finalize_options(self):
         super().finalize_options()
         self.root_is_pure = False
-        self.build_number = release or None
 
     def get_tag(self):
         plat_tag = super().get_tag()[-1]
         return (self.python_tag, "none", plat_tag)
 
 
-mpiname = os.environ.get("MPINAME", "mpich")
+with open("METADATA") as fobj:
+    metadata = re.search(r"""
+    Name:\s*(?P<name>.*)\n
+    Version:\s*(?P<version>.*)\n
+    """, fobj.read(), re.VERBOSE).groupdict()
+
+mpiname = metadata["name"]
+version = metadata["version"]
 release = os.environ.get("RELEASE", "")
-pkgname = mpiname
+if release:
+    version += f".post{release}"
 
 if mpiname == "mpich":
     project = "MPICH"
-    version_re = re.compile(r"""
-    \#define\s+MPICH_VERSION\s+\"(.*)\"
-    """, re.VERBOSE)
     license = "LicenseRef-MPICH"
     author = "MPICH Team"
     author_email = "discuss@mpich.org"
@@ -39,11 +46,6 @@ if mpiname == "mpich":
 
 if mpiname == "openmpi":
     project = "Open MPI"
-    version_re = re.compile(r"""
-    \#define\s+OMPI_MAJOR_VERSION\s+(\d+)\n
-    \#define\s+OMPI_MINOR_VERSION\s+(\d+)\n
-    \#define\s+OMPI_RELEASE_VERSION\s+(\d+)\n
-    """, re.VERBOSE)
     license = "LicenseRef-OpenMPI"
     author = "Open MPI Team"
     author_email = "users@lists.open-mpi.org"
@@ -57,17 +59,15 @@ if mpiname == "openmpi":
     }
 
 description = "A high performance implementation of MPI"
-long_description = f"""`{project} <{project_urls["Homepage"]}>`_ is a
-high-performance and widely portable implementation of the Message
-Passing Interface (`MPI <https://www.mpi-forum.org/>`_) standard."""
+long_description = f"""\
+`{project} <{project_urls["Homepage"]}>`_ \
+is a high-performance implementation of the
+Message Passing Interface (`MPI <https://www.mpi-forum.org/>`_) standard."""
 
 prefix = os.environ.get("PREFIX", f"/opt/{mpiname}")
 basedir = os.path.dirname(__file__)
 destdir = os.environ.get("DESTDIR", f"{basedir}/install")
 rootdir = f"{destdir}{prefix}"
-
-with open(f"{rootdir}/include/mpi.h") as fobj:
-    version = ".".join(version_re.search(fobj.read()).groups())
 
 data_files = []
 for path, dirs, files in os.walk(rootdir):
@@ -82,10 +82,10 @@ cmdclass = {
 }
 
 setup(
-    name=pkgname,
+    name=mpiname,
     version=version,
     license=license,
-    license_files=["LICENSE"],
+    license_files=["LICENSE", "LICENSE.*"],
     description=description,
     long_description=long_description,
     long_description_content_type="text/x-rst",

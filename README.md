@@ -5,7 +5,7 @@ This repository builds and publishes [MPICH](https://www.mpich.org) and
 a variety of
 
 - operating systems: *Linux*, *macOS*;
-- processor architectures: *AMD64*, *ARM64*, *PPC64*;
+- processor architectures: *AMD64*, *ARM64*;
 - Python implementations: *CPython*, *PyPy*.
 
 MPI wheels are uploaded to the [Anaconda.org](https://anaconda.org/mpi4py)
